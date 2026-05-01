@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor / tooling state
+.Rhistory
+.vscode/
+.idea/
+
+# Claude Code session state
+.claude/
+
+# Logs
+*.log
