@@ -462,6 +462,8 @@ body[data-screen="go"] {
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 
 .hold-btn .hold-ring {

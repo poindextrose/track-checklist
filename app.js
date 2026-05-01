@@ -442,18 +442,20 @@ function addItem(phase) {
 function attachHoldHandler(button, ms, onComplete) {
   let raf = null;
   let startTs = 0;
+  let active = false;
 
   const reset = () => {
     if (raf) cancelAnimationFrame(raf);
     raf = null;
     startTs = 0;
+    active = false;
     button.classList.remove("holding", "complete");
     button.style.removeProperty("--hold-progress");
   };
 
-  const onDown = (e) => {
-    e.preventDefault();
-    button.setPointerCapture?.(e.pointerId);
+  const begin = () => {
+    if (active) return;
+    active = true;
     startTs = performance.now();
     button.classList.add("holding");
 
@@ -465,6 +467,7 @@ function attachHoldHandler(button, ms, onComplete) {
         button.classList.add("complete");
         button.classList.remove("holding");
         raf = null;
+        active = false;
         if (navigator.vibrate) navigator.vibrate(30);
         onComplete();
         setTimeout(reset, 250);
@@ -475,15 +478,42 @@ function attachHoldHandler(button, ms, onComplete) {
     raf = requestAnimationFrame(tick);
   };
 
-  const onUp = () => {
+  const cancel = () => {
     if (button.classList.contains("complete")) return;
     reset();
   };
 
-  button.addEventListener("pointerdown", onDown);
-  button.addEventListener("pointerup", onUp);
-  button.addEventListener("pointercancel", onUp);
-  button.addEventListener("pointerleave", onUp);
+  // Use touch events on touch-capable devices. Pointer events on older
+  // Chromium variants (e.g. the Tesla in-car browser) fire spurious
+  // pointercancel mid-hold that `touch-action: none` doesn't suppress.
+  if ("ontouchstart" in window || navigator.maxTouchPoints > 0) {
+    button.addEventListener(
+      "touchstart",
+      (e) => {
+        e.preventDefault();
+        begin();
+      },
+      { passive: false },
+    );
+    button.addEventListener("touchend", (e) => {
+      e.preventDefault();
+      cancel();
+    });
+    button.addEventListener("touchcancel", cancel);
+  } else {
+    button.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      button.setPointerCapture?.(e.pointerId);
+      begin();
+    });
+    button.addEventListener("pointerup", cancel);
+    button.addEventListener("pointercancel", cancel);
+    button.addEventListener("pointerleave", cancel);
+  }
+
+  // Suppress the long-press → context menu pipeline. On Chromium it fires
+  // ~500-1000ms into a touch hold and aborts the touch sequence.
+  button.addEventListener("contextmenu", (e) => e.preventDefault());
 }
 
 // -----------------------------------------------------------------
