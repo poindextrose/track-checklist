@@ -107,6 +107,32 @@ test("startNextSession clears recycling lists across devices", async () => {
   assert.equal(byId.in, true, "non-recycling item untouched");
 });
 
+test("concurrent sync() calls do not double-append the queue", async () => {
+  const sheet = sharedSheet();
+  const A = createStore({ device: "dA", sheets: connection(sheet), storage: fakeStorage(), clock: mkClock(), idgen: mkIdgen("dA") });
+  A.dispatch("list.upsert", "l1", { title: "Pre", recycles: false, order: 0 });
+  // Fire several overlapping syncs, like the UI does (one per rapid edit).
+  await Promise.all([A.sync(), A.sync(), A.sync()]);
+  assert.equal(sheet.rows.length, 1, "the single queued event is appended exactly once");
+});
+
+test("rapid same-millisecond edits preserve dispatch order, not id order", async () => {
+  // Reproduces the production bug: the wall clock returns the same timestamp
+  // for edits fired in one millisecond, and random event ids tie-break in an
+  // order unrelated to when the edits happened. Here the rename's id sorts
+  // BEFORE the create's id, so without monotonic timestamps the stale
+  // "New list" would win over the newer "Renamed".
+  const sheet = sharedSheet();
+  const constClock = () => "2026-07-02T10:00:00.000Z";
+  const ids = ["m-create", "a-rename"]; // rename id < create id lexically
+  let k = 0;
+  const idgen = () => ids[k++];
+  const A = createStore({ device: "dA", sheets: connection(sheet), storage: fakeStorage(), clock: constClock, idgen });
+  A.dispatch("list.upsert", "l1", { title: "New list", recycles: false, order: 0 });
+  A.dispatch("list.upsert", "l1", { title: "Renamed" });
+  assert.equal(A.state().lists[0].title, "Renamed");
+});
+
 // -----------------------------------------------------------------
 // fakes
 // -----------------------------------------------------------------
