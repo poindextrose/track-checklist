@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "Marks .js files as ES modules so `node --test` can exercise the pure sync logic. Not required to run the app (a plain static site) — no build step, no dependencies.",
+  "scripts": {
+    "test": "node --test"
+  }
+}
