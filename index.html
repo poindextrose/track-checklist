@@ -8,7 +8,7 @@
   />
   <meta name="theme-color" content="#0b0d10" />
   <title>Track Day Checklist</title>
-  <link rel="stylesheet" href="styles.css?v=cloud1" />
+  <link rel="stylesheet" href="styles.css?v=cloud2" />
 </head>
 <body data-screen="setup">
 
@@ -43,8 +43,21 @@
   <!-- ============================================================ -->
   <!-- HEADER (shared by pre, post, packup, between, final)          -->
   <!-- ============================================================ -->
-  <header class="app-header" id="app-header" hidden>
+  <header class="app-header" id="app-header">
     <div class="sheet-title">Track Day Checklist</div>
+    <button
+      class="icon-btn cloud-signin-trigger"
+      type="button"
+      aria-label="Sign in with Google to sync across devices"
+      title="Sign in with Google (Cloud sync)"
+    >
+      <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"
+        />
+      </svg>
+    </button>
     <button class="icon-btn" id="btn-settings" aria-label="Settings">
       <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
         <path

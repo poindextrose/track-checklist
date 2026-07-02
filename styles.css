@@ -95,13 +95,6 @@ body[data-screen="between"] #app-header,
 body[data-screen="final"] #app-header {
   display: flex;
 }
-body[data-screen="pre"] #app-header[hidden],
-body[data-screen="post"] #app-header[hidden],
-body[data-screen="packup"] #app-header[hidden],
-body[data-screen="between"] #app-header[hidden],
-body[data-screen="final"] #app-header[hidden] {
-  display: none;
-}
 
 body[data-screen="go"] {
   background: var(--success);
@@ -215,7 +208,8 @@ body[data-screen="go"] {
   border-bottom: 1px solid var(--border);
   padding: calc(8px + var(--safe-top)) calc(12px + var(--safe-right)) 8px
     calc(12px + var(--safe-left));
-  display: flex;
+  /* Hidden by default; shown only on the checklist screens below. */
+  display: none;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
