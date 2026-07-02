@@ -17,6 +17,29 @@ modern mobile or desktop browser.
 Lists are stored in your browser's `localStorage`. No accounts, no servers, no
 Google Cloud setup.
 
+## Two modes
+
+- **Local mode** (default): the flow above. Anonymous, offline, `localStorage`
+  only — no sign-in. This is also the fallback if Google sign-in isn't
+  available (e.g. blocked in the Tesla browser).
+- **Cloud mode** (optional, sign in with Google): define any number of your own
+  lists, each flagged one-time (reset manually) or recycling (cleared by a
+  **Start next session** button). Lists **and their check marks** sync across
+  devices through a Google Sheet you own; the app runs offline and syncs when it
+  reconnects, via an append-only change log. Setup takes one OAuth Client ID —
+  see [docs/GCP_SETUP.md](docs/GCP_SETUP.md).
+
+## Development / tests
+
+Still a build-free static site — open `index.html` on any static server. The
+pure sync logic (`cloud/log.js`, `cloud/store.js`, `cloud/sheets.js`) has unit
+tests; `package.json` exists only so `node --test` treats the files as ES
+modules. Run them with:
+
+```sh
+node --test
+```
+
 ---
 
 ## Deploy to GitHub Pages
