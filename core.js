@@ -62,8 +62,8 @@ export function snapshotChecks(ctx) {
   return texts;
 }
 
-export function makeSortable(ctx) {
-  return Sortable.create(ctx.listEl, {
+export function makeSortable(ctx, { withOnEnd = true } = {}) {
+  const options = {
     handle: ".drag-handle",
     animation: 150,
     forceFallback: true,
@@ -71,7 +71,14 @@ export function makeSortable(ctx) {
     ghostClass: "sortable-ghost",
     chosenClass: "sortable-chosen",
     dragClass: "sortable-drag",
-    onEnd: () => {
+  };
+  // The transient sortable created while adding the first item to an empty
+  // list must NOT persist on drag: its only row is the in-progress edit
+  // placeholder (item text still undefined), so reordering it would save an
+  // empty list and discard the edit. renderChecklist rebuilds a real,
+  // onEnd-bearing sortable as soon as the item is saved.
+  if (withOnEnd) {
+    options.onEnd = () => {
       // Read new order from DOM, persist, and re-render with checks preserved.
       const preserved = snapshotChecks(ctx);
       const items = ctx.getItems();
@@ -84,8 +91,9 @@ export function makeSortable(ctx) {
       });
       ctx.setItems(newOrder);
       renderChecklist(ctx, preserved);
-    },
-  });
+    };
+  }
+  return Sortable.create(ctx.listEl, options);
 }
 
 export function renderChecklist(ctx, preserveTexts = null) {
@@ -325,9 +333,9 @@ export function addItem(ctx) {
   listEl.appendChild(li);
 
   // Initialise sortable for the new row if there isn't one already (empty
-  // lists don't get a sortable instance).
+  // lists don't get a sortable instance). No onEnd — see makeSortable.
   if (!ctx._sortable) {
-    ctx._sortable = makeSortable(ctx);
+    ctx._sortable = makeSortable(ctx, { withOnEnd: false });
   }
 
   enterEditMode(li, ctx);
