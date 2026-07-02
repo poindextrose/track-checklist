@@ -58,9 +58,9 @@ function renderHome() {
     root.appendChild(empty);
   }
 
-  if (oneTime.length) root.appendChild(listGroup("One-time", oneTime, state));
+  if (oneTime.length) root.appendChild(listGroup("Persistent", oneTime, state));
   if (perSession.length) {
-    root.appendChild(listGroup("Per-session", perSession, state));
+    root.appendChild(listGroup("Auto recycles", perSession, state));
     // "Start next session" clears every recycling list at once.
     const startBtn = document.createElement("button");
     startBtn.className = "btn btn-primary cloud-start-session";
@@ -394,7 +394,7 @@ function renderSettings() {
       syncNow();
     });
     recycle.appendChild(cb);
-    recycle.appendChild(document.createTextNode(" recycles"));
+    recycle.appendChild(document.createTextNode(" auto recycles"));
 
     const del = document.createElement("button");
     del.className = "icon-btn icon-btn-small";
