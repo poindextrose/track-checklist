@@ -80,7 +80,10 @@ body[data-screen="post"] .screen[data-screen-name="post"],
 body[data-screen="between"] .screen[data-screen-name="between"],
 body[data-screen="timer"] .screen[data-screen-name="timer"],
 body[data-screen="packup"] .screen[data-screen-name="packup"],
-body[data-screen="final"] .screen[data-screen-name="final"] {
+body[data-screen="final"] .screen[data-screen-name="final"],
+body[data-screen="cloud-home"] .screen[data-screen-name="cloud-home"],
+body[data-screen="cloud-list"] .screen[data-screen-name="cloud-list"],
+body[data-screen="cloud-settings"] .screen[data-screen-name="cloud-settings"] {
   display: block;
 }
 
@@ -698,6 +701,149 @@ body[data-screen="go"] {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* =================================================================
+   Cloud mode
+   ================================================================= */
+
+.list-group {
+  margin: 8px 0 20px;
+}
+
+.list-group-label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin: 0 0 10px;
+  font-weight: 700;
+}
+
+.list-picker-row {
+  width: 100%;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  text-align: left;
+}
+
+.list-picker-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-picker-count {
+  flex-shrink: 0;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+}
+
+.list-picker-row.list-complete {
+  border-color: var(--success-strong);
+}
+
+.list-picker-row.list-complete .list-picker-count {
+  color: var(--success);
+}
+
+.cloud-start-session {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.settings-list-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.settings-list-name {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 1rem;
+  font-family: inherit;
+  padding: 12px 12px;
+  min-height: 52px;
+  outline: none;
+}
+
+.settings-list-name:focus {
+  border-color: var(--accent);
+}
+
+.settings-recycle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.settings-recycle input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--accent);
+}
+
+.cloud-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 24px 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.cloud-clientid-input {
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.cloud-status {
+  position: fixed;
+  top: calc(10px + var(--safe-top));
+  right: calc(12px + var(--safe-right));
+  z-index: 60;
+  display: none;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+}
+
+body[data-screen="cloud-home"] .cloud-status,
+body[data-screen="cloud-list"] .cloud-status,
+body[data-screen="cloud-settings"] .cloud-status {
+  display: inline-block;
+}
+
+.cloud-status[data-status="offline"] {
+  color: var(--warning);
+  border-color: var(--warning);
+}
+
+.cloud-status[data-status="syncing"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.cloud-status[data-status="synced"] {
+  color: var(--success);
+  border-color: var(--success-strong);
 }
 
 /* =================================================================
