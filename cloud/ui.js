@@ -209,18 +209,28 @@ function editCloudRow(li) {
   const id = li.dataset.id;
   const item = store.state().items.find((i) => i.id === id);
   const originalText = item ? item.text : "";
-  startInlineEdit(li, originalText, (value, save) => {
-    if (save && value === "") {
+  startInlineEdit(
+    li,
+    originalText,
+    (value, save) => {
+      if (save && value === "") {
+        store.dispatch("item.delete", id, {});
+        renderList();
+      } else if (save && value !== originalText) {
+        store.dispatch("item.upsert", id, { text: value });
+        renderList();
+      } else {
+        renderList(); // cancel / no-op: restore the row
+      }
+      syncNow();
+    },
+    () => {
+      // Explicit trash-button delete.
       store.dispatch("item.delete", id, {});
       renderList();
-    } else if (save && value !== originalText) {
-      store.dispatch("item.upsert", id, { text: value });
-      renderList();
-    } else {
-      renderList(); // cancel / no-op: restore the row
-    }
-    syncNow();
-  });
+      syncNow();
+    },
+  );
 }
 
 function addCloudItem() {
@@ -253,8 +263,10 @@ function addCloudItem() {
   li.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-// Shared inline text editor. onDone(value, save) is called once.
-function startInlineEdit(li, originalText, onDone) {
+// Shared inline text editor. onDone(value, save) is called once. If onDelete
+// is provided, a trash button appears (replacing the edit pencil) that removes
+// the item outright.
+function startInlineEdit(li, originalText, onDone, onDelete) {
   editing = true;
   li.classList.add("editing");
   const area = li.querySelector(".check-area");
@@ -279,6 +291,27 @@ function startInlineEdit(li, originalText, onDone) {
     const value = input.value.trim();
     onDone(value, save);
   };
+
+  if (onDelete) {
+    const pencil = li.querySelector(".row-edit");
+    if (pencil) pencil.style.display = "none";
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "icon-btn icon-btn-small row-delete";
+    del.setAttribute("aria-label", "Delete item");
+    del.innerHTML =
+      `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">` +
+      `<path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" /></svg>`;
+    li.appendChild(del);
+    del.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (resolved) return;
+      resolved = true;
+      editing = false;
+      onDelete();
+    });
+  }
+
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -288,7 +321,9 @@ function startInlineEdit(li, originalText, onDone) {
       finish(false);
     }
   });
-  input.addEventListener("blur", () => finish(true));
+  // Defer the save-on-blur by a tick so a click on the trash button (which
+  // blurs the input) wins the race and deletes instead of saving.
+  input.addEventListener("blur", () => setTimeout(() => finish(true), 0));
 }
 
 function makeCloudSortable(ul) {

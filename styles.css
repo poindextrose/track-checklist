@@ -775,6 +775,15 @@ body[data-screen="go"] {
   width: 100%;
 }
 
+.row-delete {
+  justify-self: end;
+  color: var(--danger);
+}
+
+.row-delete:active {
+  color: var(--text);
+}
+
 .settings-list-name {
   width: 100%;
   background: var(--surface-2);
