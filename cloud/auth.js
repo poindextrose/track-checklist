@@ -20,10 +20,12 @@ const LS_MODE = "tcl_mode";
 const LS_SHEET_ID = "tcl_sheet_id";
 const LS_CLIENT_ID = "tcl_client_id";
 
-// Optionally hard-code your OAuth Web Client ID here. If left blank, the app
-// reads it from localStorage (settable via the Cloud settings field), so the
-// same static build works for anyone who supplies their own.
-const HARDCODED_CLIENT_ID = "";
+// The app's OAuth Web Client ID. Not a secret — it only works from the
+// Authorized JavaScript origins configured in the Google Cloud project. If
+// left blank, the app falls back to a value stored in localStorage (settable
+// via the Cloud settings field).
+const HARDCODED_CLIENT_ID =
+  "339043595837-1bga1hrs7vl40vqo0jbna9d7f5pg2avn.apps.googleusercontent.com";
 
 let tokenClient = null;
 let accessToken = null;
