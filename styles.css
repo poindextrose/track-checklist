@@ -832,8 +832,9 @@ body[data-screen="go"] {
 
 .cloud-status {
   position: fixed;
-  top: calc(10px + var(--safe-top));
-  right: calc(12px + var(--safe-right));
+  /* Bottom-left so it never overlaps the header icons (gear / reset / back). */
+  bottom: calc(12px + var(--safe-bottom));
+  left: calc(12px + var(--safe-left));
   z-index: 60;
   display: none;
   padding: 4px 12px;
