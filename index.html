@@ -8,7 +8,7 @@
   />
   <meta name="theme-color" content="#0b0d10" />
   <title>Track Day Checklist</title>
-  <link rel="stylesheet" href="styles.css?v=cloud2" />
+  <link rel="stylesheet" href="styles.css?v=cloud3" />
 </head>
 <body data-screen="setup">
 
@@ -238,6 +238,9 @@
       </button>
     </div>
     <div id="cloud-home-lists"></div>
+    <button class="btn btn-secondary btn-add-item" id="cloud-home-add-list">
+      + Add list
+    </button>
   </section>
 
   <!-- ============================================================ -->
@@ -275,10 +278,10 @@
       </button>
       <h2 class="phase-heading">Manage lists</h2>
     </div>
+    <p class="setup-help cloud-settings-hint">
+      Drag ≡ to reorder. Tick "recycles" for per-session lists.
+    </p>
     <div id="cloud-settings-lists"></div>
-    <button class="btn btn-secondary btn-add-item" id="cloud-add-list">
-      + Add list
-    </button>
 
     <div class="cloud-settings-section">
       <label class="setup-help" for="cloud-clientid-input">

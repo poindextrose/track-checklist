@@ -318,11 +318,24 @@ function makeCloudSortable(ul) {
 function renderSettings() {
   const state = store.state();
   const root = $("cloud-settings-lists");
+  if (root._sortable) {
+    root._sortable.destroy();
+    root._sortable = null;
+  }
   root.innerHTML = "";
 
   for (const list of state.lists) {
     const rowEl = document.createElement("div");
     rowEl.className = "settings-list-row";
+    rowEl.dataset.id = list.id;
+
+    const handle = document.createElement("span");
+    handle.className = "drag-handle";
+    handle.setAttribute("aria-label", "Drag to reorder list");
+    handle.innerHTML =
+      `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">` +
+      `<path fill="currentColor" d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z" /></svg>`;
+    rowEl.appendChild(handle);
 
     const name = document.createElement("input");
     name.type = "text";
@@ -364,21 +377,83 @@ function renderSettings() {
     root.appendChild(rowEl);
   }
 
+  if (state.lists.length) root._sortable = makeListsSortable(root);
+
   const status = $("cloud-clientid-input");
   if (status && hooks.getClientId) status.value = hooks.getClientId();
 }
 
-function addList() {
-  const order = store.state().lists.length;
-  const id = store.newId();
-  store.dispatch("list.upsert", id, {
-    title: "New list",
-    recycles: false,
-    order,
+function makeListsSortable(container) {
+  return Sortable.create(container, {
+    handle: ".drag-handle",
+    animation: 150,
+    forceFallback: true,
+    fallbackTolerance: 5,
+    ghostClass: "sortable-ghost",
+    chosenClass: "sortable-chosen",
+    dragClass: "sortable-drag",
+    onEnd: () => {
+      const ids = [...container.querySelectorAll(".settings-list-row")].map(
+        (r) => r.dataset.id,
+      );
+      ids.forEach((id, idx) => {
+        if (id) store.dispatch("list.upsert", id, { order: idx });
+      });
+      renderSettings();
+      renderHome();
+      syncNow();
+    },
   });
-  renderSettings();
-  renderHome();
-  syncNow();
+}
+
+// Add a list straight from the home screen with an inline name field.
+// New lists default to one-time (non-recycling); recycles/order/delete are
+// managed on the settings screen.
+function addListInline() {
+  const root = $("cloud-home-lists");
+  const empty = root.querySelector(".setup-help");
+  if (empty) empty.remove();
+
+  const wrap = document.createElement("div");
+  wrap.className = "list-add-row";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "settings-list-name";
+  input.placeholder = "New list name";
+  input.autocomplete = "off";
+  input.autocapitalize = "sentences";
+  wrap.appendChild(input);
+  root.appendChild(wrap);
+  input.focus();
+  wrap.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+  editing = true;
+  let resolved = false;
+  const finish = (save) => {
+    if (resolved) return;
+    resolved = true;
+    editing = false;
+    const title = input.value.trim();
+    if (save && title) {
+      store.dispatch("list.upsert", store.newId(), {
+        title,
+        recycles: false,
+        order: store.state().lists.length,
+      });
+      syncNow();
+    }
+    renderHome();
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      finish(true);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      finish(false);
+    }
+  });
+  input.addEventListener("blur", () => finish(true));
 }
 
 // -----------------------------------------------------------------
@@ -399,7 +474,7 @@ function wireChrome() {
     setScreen("cloud-home");
   });
   $("cloud-add-item").addEventListener("click", addCloudItem);
-  $("cloud-add-list").addEventListener("click", addList);
+  $("cloud-home-add-list").addEventListener("click", addListInline);
 
   $("cloud-list-reset").addEventListener("click", () => {
     if (currentListId) {

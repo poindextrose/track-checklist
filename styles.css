@@ -752,10 +752,27 @@ body[data-screen="go"] {
 
 .settings-list-row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 10px;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 8px;
   align-items: center;
   margin-bottom: 10px;
+}
+
+.settings-list-row .drag-handle {
+  width: 32px;
+  height: 44px;
+}
+
+.cloud-settings-hint {
+  margin: 0 0 12px;
+}
+
+.list-add-row {
+  margin-bottom: 10px;
+}
+
+.list-add-row .settings-list-name {
+  width: 100%;
 }
 
 .settings-list-name {
