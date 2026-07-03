@@ -36,9 +36,9 @@ const HARDCODED_CLIENT_ID =
   "339043595837-1bga1hrs7vl40vqo0jbna9d7f5pg2avn.apps.googleusercontent.com";
 
 // Base URL of the refresh-token broker (server/worker.js on Cloudflare).
-// Empty = legacy 1-hour token flow. Set this to the deployed Worker URL to
-// enable indefinite sign-in.
-const HARDCODED_AUTH_BASE = "";
+// Empty = legacy 1-hour token flow. Set to the deployed Worker URL to enable
+// indefinite sign-in.
+const HARDCODED_AUTH_BASE = "https://tcl-auth.poindextrose.workers.dev";
 
 let tokenClient = null;
 let accessToken = null;
@@ -125,7 +125,9 @@ export async function signIn() {
 }
 
 function redirectUri() {
-  return location.origin + location.pathname;
+  // Normalize to the directory form so it matches one registered redirect URI
+  // regardless of whether the app was loaded as .../ or .../index.html.
+  return location.origin + location.pathname.replace(/index\.html$/, "");
 }
 
 // Backend mode: full-page redirect to Google's auth-code endpoint. We force
