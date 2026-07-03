@@ -121,6 +121,23 @@ window.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", signInFlow);
   });
 
+  // Test/dev seam: drive Cloud mode against an injected Sheets client with no
+  // Google. Used for automated browser verification of the cloud UI + store.
+  window.__tclCloudTest = (fakeSheets) => startCloud(null, fakeSheets);
+
+  if (auth.hasPendingRedirect()) {
+    // Backend mode: we just came back from Google's auth-code redirect.
+    auth
+      .completeRedirectSignIn()
+      .then((session) => startCloud(session))
+      .catch((err) => {
+        console.error("Cloud sign-in failed:", err);
+        toast("Google sign-in failed — staying in Local mode.");
+        local.enter();
+      });
+    return;
+  }
+
   if (auth.hasCloudSession()) {
     // Previously signed in on this device: resume Cloud mode immediately from
     // the local cache (offline-first). The token is re-acquired silently on
@@ -130,9 +147,4 @@ window.addEventListener("DOMContentLoaded", () => {
   } else {
     local.enter();
   }
-
-  // Test/dev seam: drive Cloud mode against an injected Sheets client with no
-  // Google. Used for automated browser verification of the cloud UI + store.
-  window.__tclCloudTest = (fakeSheets) =>
-    startCloud(null, fakeSheets);
 });

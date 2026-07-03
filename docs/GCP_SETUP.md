@@ -118,9 +118,35 @@ A dialog shows your **Client ID** (looks like
   — nothing is lost, you just won't get cloud sync in the car.
 - **Nothing here costs money** or needs billing enabled.
 
+---
+
+## Optional: indefinite sign-in (the auth broker)
+
+By default the app uses Google's 1-hour access token. To let users **stay
+signed in indefinitely** (so the iOS home-screen app never re-prompts), deploy
+the small Cloudflare Worker in [`server/`](../server/README.md). It needs a few
+extra Google Cloud changes:
+
+1. **Copy the client secret.** On your OAuth **Web** client, copy the *Client
+   secret* (the value Step 5 said you could ignore). It goes into the Worker
+   via `wrangler secret put GOOGLE_CLIENT_SECRET` — never into the static site.
+2. **Add an Authorized redirect URI** (Credentials → your OAuth client →
+   *Authorized redirect URIs* → Add): your exact app URL, e.g.
+   `https://poindextrose.github.io/track-checklist/` (and `http://localhost:8017/`
+   for dev). The indefinite-sign-in flow uses a redirect, unlike the default.
+3. **Publish the OAuth app to production.** OAuth consent screen → **Publish
+   app** → confirm. This is what makes refresh tokens **non-expiring** — in
+   "Testing" mode they die after 7 days. Because the app only uses the
+   non-sensitive `drive.file` scope, publishing does **not** trigger Google's
+   verification review (remove any other scopes first).
+4. **Deploy the Worker** ([`server/README.md`](../server/README.md)) and set its
+   URL as `AUTH_BASE` in `cloud/auth.js` (or `localStorage.tcl_auth_base`).
+
+Leaving `AUTH_BASE` empty keeps the current 1-hour token flow, which is also the
+automatic fallback if the Worker is ever unreachable.
+
 ## What I need back from you
 
-Just the **Client ID** string from Step 5, plus your **GitHub Pages URL**
-(or intended username) so we get the production origin right. With those I'll
-finish `cloud/auth.js`, connect it to your Sheet, and we'll test the full
-sign-in → create-sheet → sync round-trip.
+The **Client ID** and your **GitHub Pages URL** for the standard setup. For
+indefinite sign-in, also the deployed **Worker URL** and the **client secret**
+stored in the Worker (not shared with the static site).
