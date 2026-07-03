@@ -346,7 +346,7 @@ export function addItem(ctx) {
 // Press-and-hold helper
 // -----------------------------------------------------------------
 
-export function attachHoldHandler(button, ms, onComplete) {
+export function attachHoldHandler(button, ms, onComplete, onShortTap) {
   let raf = null;
   let startTs = 0;
   let active = false;
@@ -387,7 +387,10 @@ export function attachHoldHandler(button, ms, onComplete) {
 
   const cancel = () => {
     if (button.classList.contains("complete")) return;
+    const wasActive = active;
     reset();
+    // Released before the hold completed — treat as a tap.
+    if (wasActive && onShortTap) onShortTap();
   };
 
   // Use touch events on touch-capable devices. Pointer events on older

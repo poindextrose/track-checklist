@@ -11,7 +11,7 @@
 // is keyed by item/list id (not array index like Local mode).
 // =================================================================
 
-import { $, setScreen, toast } from "../core.js";
+import { $, setScreen, toast, attachHoldHandler } from "../core.js";
 
 let store = null;
 let hooks = {};
@@ -302,7 +302,7 @@ function addCloudRow(kind) {
   ul.appendChild(li);
 
   const order = itemsOf(list.id).length;
-  startInlineEdit(li, "", (value, save) => {
+  startInlineEdit(li, "", (value, save, viaEnter) => {
     if (save && value !== "") {
       const id = store.newId();
       store.dispatch("item.upsert", id, {
@@ -313,6 +313,13 @@ function addCloudRow(kind) {
       });
       pushUndo(() => store.dispatch("item.upsert", id, { deleted: true }));
       syncNow();
+      if (viaEnter) {
+        // Pressing Enter keeps you typing: re-render the saved row, then open
+        // a fresh add row of the same kind so you can add several in a row.
+        renderList();
+        addCloudRow(kind);
+        return;
+      }
     }
     renderList();
   });
@@ -340,12 +347,12 @@ function startInlineEdit(li, originalText, onDone, onDelete) {
   input.setSelectionRange(input.value.length, input.value.length);
 
   let resolved = false;
-  const finish = (save) => {
+  const finish = (save, viaEnter = false) => {
     if (resolved) return;
     resolved = true;
     editing = false;
     const value = input.value.trim();
-    onDone(value, save);
+    onDone(value, save, viaEnter);
   };
 
   if (onDelete) {
@@ -375,7 +382,7 @@ function startInlineEdit(li, originalText, onDone, onDelete) {
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      finish(true);
+      finish(true, true); // viaEnter — the add flow chains another row
     } else if (e.key === "Escape") {
       e.preventDefault();
       finish(false);
@@ -604,14 +611,21 @@ function wireChrome() {
   $("cloud-home-add-list").addEventListener("click", addListInline);
   $("cloud-undo").addEventListener("click", undo);
 
-  $("cloud-list-reset").addEventListener("click", () => {
-    if (currentListId) {
-      store.resetList(currentListId);
-      renderList();
-      toast("List reset.");
-      syncNow();
-    }
-  });
+  // Reset guards against accidental taps: a tap just flashes a hint; you must
+  // hold for 2 seconds (with a filling animation) to actually reset the list.
+  attachHoldHandler(
+    $("cloud-list-reset"),
+    2000,
+    () => {
+      if (currentListId) {
+        store.resetList(currentListId);
+        renderList();
+        toast("List reset.");
+        syncNow();
+      }
+    },
+    () => toast("Hold to reset"),
+  );
 
   $("cloud-signout").addEventListener("click", () => {
     stopPolling();

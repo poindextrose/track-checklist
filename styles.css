@@ -823,6 +823,25 @@ body[data-screen="go"] {
   pointer-events: none;
 }
 
+/* Hold-to-reset: a red sweep fills the icon as you hold through 2s */
+.hold-reset {
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+
+.hold-reset.holding {
+  background: conic-gradient(
+    var(--danger) calc(var(--hold-progress, 0) * 1turn),
+    var(--surface-2) 0
+  );
+  color: var(--text);
+}
+
+.hold-reset.complete {
+  background: var(--danger);
+  color: #fff;
+}
+
 .settings-list-name {
   width: 100%;
   background: var(--surface-2);
