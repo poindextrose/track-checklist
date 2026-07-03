@@ -8,7 +8,7 @@
   />
   <meta name="theme-color" content="#0b0d10" />
   <title>Track Day Checklist</title>
-  <link rel="stylesheet" href="styles.css?v=cloud9" />
+  <link rel="stylesheet" href="styles.css?v=cloud10" />
 </head>
 <body data-screen="setup">
 
@@ -230,7 +230,10 @@
   <!-- ============================================================ -->
   <section class="screen" data-screen-name="cloud-home">
     <div class="phase-heading-row">
-      <h2 class="phase-heading">Your lists</h2>
+      <h2 class="phase-heading">
+        Your lists
+        <span class="cloud-status" data-status="synced">Synced</span>
+      </h2>
       <button class="icon-btn" id="cloud-settings-gear" aria-label="Cloud settings">
         <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
           <path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.61l-1.92-3.32a.5.5 0 0 0-.59-.22l-2.39.96a7.07 7.07 0 0 0-1.62-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.55-1.62.94l-2.39-.96a.5.5 0 0 0-.59.22L2.68 8.48a.5.5 0 0 0 .12.61l2.03 1.58c-.05.3-.07.62-.07.94 0 .33.02.64.07.94l-2.03 1.58a.5.5 0 0 0-.12.61l1.92 3.32c.14.24.43.34.7.22l2.39-.96c.49.39 1.03.7 1.62.94l.36 2.54a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54c.59-.24 1.13-.55 1.62-.94l2.39.96c.27.11.56.02.7-.22l1.92-3.32a.5.5 0 0 0-.12-.61l-2.03-1.58zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" />
@@ -253,7 +256,10 @@
           <path fill="currentColor" d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
         </svg>
       </button>
-      <h2 class="phase-heading" id="cloud-list-title"></h2>
+      <h2 class="phase-heading">
+        <span id="cloud-list-title"></span>
+        <span class="cloud-status" data-status="synced">Synced</span>
+      </h2>
       <button class="icon-btn icon-btn-small" id="cloud-undo" aria-label="Undo last change" disabled>
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
           <path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" />
@@ -282,7 +288,10 @@
           <path fill="currentColor" d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
         </svg>
       </button>
-      <h2 class="phase-heading">Manage lists</h2>
+      <h2 class="phase-heading">
+        Manage lists
+        <span class="cloud-status" data-status="synced">Synced</span>
+      </h2>
     </div>
     <p class="setup-help cloud-settings-hint">
       Drag ≡ to reorder. Tick "auto recycles" for lists that reset each session.
@@ -309,9 +318,6 @@
       Sign out (return to Local mode)
     </button>
   </section>
-
-  <!-- Cloud sync status pill (visible on cloud screens) -->
-  <div class="cloud-status" id="cloud-status" data-status="synced">Synced</div>
 
   <!-- ============================================================ -->
   <!-- SETTINGS MODAL                                                -->

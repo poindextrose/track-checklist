@@ -657,8 +657,10 @@ function wireChrome() {
     if (hooks.onSignOut) hooks.onSignOut();
   });
 
-  // Tap the pill while offline to re-authenticate and resume syncing.
-  $("cloud-status").addEventListener("click", onStatusClick);
+  // Tap the status (while offline) to re-authenticate and resume syncing.
+  document
+    .querySelectorAll(".cloud-status")
+    .forEach((el) => el.addEventListener("click", onStatusClick));
 
   const saveId = $("cloud-clientid-save");
   if (saveId) {
@@ -716,19 +718,17 @@ function viewSignature() {
 }
 
 function setStatus(kind) {
-  const pill = $("cloud-status");
-  if (!pill) return;
-  pill.dataset.status = kind;
-  pill.textContent =
-    kind === "offline"
-      ? "Offline · reconnect"
-      : kind === "syncing"
-        ? "Syncing…"
-        : "Synced";
+  const text = kind === "offline" ? "Offline" : kind === "syncing" ? "Syncing…" : "Synced";
+  document.querySelectorAll(".cloud-status").forEach((pill) => {
+    pill.dataset.status = kind;
+    pill.textContent = text;
+    if (kind === "offline") pill.title = "Tap to reconnect";
+    else pill.removeAttribute("title");
+  });
 }
 
 async function onStatusClick() {
-  const pill = $("cloud-status");
+  const pill = document.querySelector(".cloud-status");
   if (!pill || pill.dataset.status !== "offline" || !hooks.onReconnect) return;
   setStatus("syncing");
   try {
