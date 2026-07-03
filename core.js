@@ -31,10 +31,17 @@ export function setScreen(name) {
 }
 
 let toastTimer = null;
-export function toast(msg, ms = 3000) {
+export function toast(msg, ms = 6000) {
   const el = $("toast");
   el.textContent = msg;
   el.hidden = false;
+  // Tap to dismiss early (attached once).
+  if (!el.dataset.dismissWired) {
+    el.dataset.dismissWired = "1";
+    el.addEventListener("click", () => {
+      el.hidden = true;
+    });
+  }
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
     el.hidden = true;
