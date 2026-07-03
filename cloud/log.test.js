@@ -51,7 +51,41 @@ test("item.upsert creates an item that defaults to unchecked", () => {
     text: "Set tire pressure",
     order: 0,
     checked: false,
+    kind: "item",
   });
+});
+
+test("an item can be a named separator via kind", () => {
+  const events = [
+    ev("e1", t(1), "d1", "item.upsert", "s1", {
+      listId: "l1",
+      text: "Warm-up",
+      order: 0,
+      kind: "separator",
+    }),
+  ];
+  const { items } = foldEvents(events);
+  assert.equal(items[0].kind, "separator");
+  assert.equal(items[0].text, "Warm-up");
+});
+
+test("item.upsert can un-delete an item (undo support)", () => {
+  const events = [
+    ev("e1", t(1), "d1", "item.upsert", "i1", { listId: "l1", text: "x", order: 0 }),
+    ev("e2", t(2), "d1", "item.delete", "i1"),
+    ev("e3", t(3), "d1", "item.upsert", "i1", { deleted: false }),
+  ];
+  const { items } = foldEvents(events);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].text, "x", "original fields survive the round-trip");
+});
+
+test("item.upsert with deleted:true removes the item", () => {
+  const events = [
+    ev("e1", t(1), "d1", "item.upsert", "i1", { listId: "l1", text: "x", order: 0 }),
+    ev("e2", t(2), "d1", "item.upsert", "i1", { deleted: true }),
+  ];
+  assert.equal(foldEvents(events).items.length, 0);
 });
 
 test("items sorted by order; deleted items excluded", () => {

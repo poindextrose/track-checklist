@@ -45,7 +45,13 @@ export function foldEvents(events) {
       }
       case "item.upsert": {
         const cur = items.get(e.target) || newItem(e.target);
-        Object.assign(cur, e.payload);
+        const p = e.payload || {};
+        if ("listId" in p) cur.listId = p.listId;
+        if ("text" in p) cur.text = p.text;
+        if ("order" in p) cur.order = p.order;
+        if ("kind" in p) cur.kind = p.kind; // "item" | "separator"
+        if ("checked" in p) cur.checked = !!p.checked;
+        if ("deleted" in p) cur._deleted = !!p.deleted; // upsertable for undo
         items.set(e.target, cur);
         break;
       }
@@ -100,6 +106,7 @@ export function foldEvents(events) {
         text: i.text,
         order: i.order,
         checked: i.checked,
+        kind: i.kind,
       })),
   };
 }
@@ -147,7 +154,15 @@ function newList(id) {
 }
 
 function newItem(id) {
-  return { id, listId: "", text: "", order: 0, checked: false, _deleted: false };
+  return {
+    id,
+    listId: "",
+    text: "",
+    order: 0,
+    checked: false,
+    kind: "item",
+    _deleted: false,
+  };
 }
 
 function byOrder(a, b) {
