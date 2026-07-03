@@ -101,11 +101,15 @@ function listGroup(label, lists, state) {
 }
 
 function progressOf(listId, state) {
-  // Separators aren't checkable, so they don't count toward progress.
+  // Separators aren't checkable, so they don't count toward progress. A
+  // skipped item counts as resolved (you've dealt with it).
   const items = state.items.filter(
     (i) => i.listId === listId && i.kind !== "separator",
   );
-  return { done: items.filter((i) => i.checked).length, total: items.length };
+  const resolved = items.filter(
+    (i) => i.status === "done" || i.status === "skipped",
+  ).length;
+  return { done: resolved, total: items.length };
 }
 
 // -----------------------------------------------------------------
@@ -163,18 +167,21 @@ function buildCloudRow(item) {
   const li = document.createElement("li");
   li.className = "check-row";
   li.dataset.id = item.id;
-  if (item.checked) li.classList.add("checked");
   li.innerHTML = `
     <span class="drag-handle" aria-label="Drag to reorder">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
         <path fill="currentColor" d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z" />
       </svg>
     </span>
-    <span class="check-area" role="checkbox" aria-checked="${item.checked}" tabindex="0">
+    <span class="check-area" role="checkbox" tabindex="0">
       <span class="check-box" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="20" height="20">
+        <svg class="ck-done" viewBox="0 0 24 24" width="20" height="20">
           <path d="M5 12.5l4.5 4.5L19 7" fill="none" stroke="currentColor"
             stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <svg class="ck-skip" viewBox="0 0 24 24" width="20" height="20">
+          <path d="M6 12h12" fill="none" stroke="currentColor"
+            stroke-width="3" stroke-linecap="round" />
         </svg>
       </span>
       <span class="check-text"></span>
@@ -185,13 +192,14 @@ function buildCloudRow(item) {
       </svg>
     </button>`;
   li.querySelector(".check-text").textContent = item.text;
+  applyStateClasses(li, item.status);
 
   const area = li.querySelector(".check-area");
-  area.addEventListener("click", () => toggleCloudCheck(li));
+  area.addEventListener("click", () => cycleCloudState(li));
   area.addEventListener("keydown", (e) => {
     if (e.key === " " || e.key === "Enter") {
       e.preventDefault();
-      toggleCloudCheck(li);
+      cycleCloudState(li);
     }
   });
   li.querySelector(".row-edit").addEventListener("click", (e) => {
@@ -199,6 +207,19 @@ function buildCloudRow(item) {
     editCloudRow(li);
   });
   return li;
+}
+
+// Reflect a status ("none" | "done" | "skipped") on a row's classes + aria.
+function applyStateClasses(li, status) {
+  li.classList.toggle("checked", status === "done");
+  li.classList.toggle("skipped", status === "skipped");
+  const area = li.querySelector(".check-area");
+  if (area) {
+    area.setAttribute(
+      "aria-checked",
+      status === "done" ? "true" : status === "skipped" ? "mixed" : "false",
+    );
+  }
 }
 
 // A named divider between items. Draggable and editable like an item, but
@@ -229,15 +250,19 @@ function buildSeparatorRow(item) {
   return li;
 }
 
-function toggleCloudCheck(li) {
+// Tapping cycles none -> done (green check) -> skipped (red dash) -> none.
+function cycleCloudState(li) {
   if (li.classList.contains("editing")) return;
   const id = li.dataset.id;
-  const prev = li.classList.contains("checked");
-  const nowChecked = !prev;
-  li.classList.toggle("checked", nowChecked);
-  li.querySelector(".check-area").setAttribute("aria-checked", String(nowChecked));
-  pushUndo(() => store.dispatch("item.check", id, { checked: prev }));
-  store.dispatch("item.check", id, { checked: nowChecked });
+  const cur = li.classList.contains("checked")
+    ? "done"
+    : li.classList.contains("skipped")
+      ? "skipped"
+      : "none";
+  const next = cur === "none" ? "done" : cur === "done" ? "skipped" : "none";
+  applyStateClasses(li, next);
+  pushUndo(() => store.dispatch("item.check", id, { status: cur }));
+  store.dispatch("item.check", id, { status: next });
   lastSig = viewSignature();
   syncNow();
 }

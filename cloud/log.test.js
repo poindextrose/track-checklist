@@ -51,8 +51,45 @@ test("item.upsert creates an item that defaults to unchecked", () => {
     text: "Set tire pressure",
     order: 0,
     checked: false,
+    status: "none",
     kind: "item",
   });
+});
+
+test("items default to status 'none'", () => {
+  const events = [
+    ev("e1", t(1), "d1", "item.upsert", "i1", { listId: "l1", text: "x", order: 0 }),
+  ];
+  assert.equal(foldEvents(events).items[0].status, "none");
+});
+
+test("item.check can set a 'skipped' status (three-state)", () => {
+  const events = [
+    ev("e1", t(1), "d1", "item.upsert", "i1", { listId: "l1", text: "x", order: 0 }),
+    ev("e2", t(2), "d1", "item.check", "i1", { status: "skipped" }),
+  ];
+  const it = foldEvents(events).items[0];
+  assert.equal(it.status, "skipped");
+  assert.equal(it.checked, false, "skipped does not count as done");
+});
+
+test("legacy {checked} events still map to done/none status", () => {
+  const done = foldEvents([
+    ev("e1", t(1), "d1", "item.upsert", "i1", { listId: "l1", text: "x", order: 0 }),
+    ev("e2", t(2), "d1", "item.check", "i1", { checked: true }),
+  ]).items[0];
+  assert.equal(done.status, "done");
+  assert.equal(done.checked, true);
+});
+
+test("session.reset clears skipped as well as done", () => {
+  const events = [
+    ev("e1", t(1), "d1", "list.upsert", "lr", { title: "Pre", recycles: true, order: 0 }),
+    ev("e2", t(2), "d1", "item.upsert", "i1", { listId: "lr", text: "x", order: 0 }),
+    ev("e3", t(3), "d1", "item.check", "i1", { status: "skipped" }),
+    ev("e4", t(4), "d1", "session.reset", "", { scope: "recycling" }),
+  ];
+  assert.equal(foldEvents(events).items[0].status, "none");
 });
 
 test("an item can be a named separator via kind", () => {

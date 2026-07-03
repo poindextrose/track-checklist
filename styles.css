@@ -316,6 +316,21 @@ body[data-screen="go"] {
   text-decoration: line-through;
 }
 
+/* Skipped: red box with a dash */
+.check-row.skipped {
+  background: var(--surface-2);
+  border-color: var(--danger);
+}
+
+.check-row.skipped .check-box {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.check-row.skipped .check-text {
+  color: var(--text-dim);
+}
+
 .drag-handle {
   display: inline-flex;
   align-items: center;
@@ -376,7 +391,11 @@ body[data-screen="go"] {
   color: white;
 }
 
-.check-row.checked .check-box svg {
+.check-row.checked .check-box .ck-done {
+  display: block;
+}
+
+.check-row.skipped .check-box .ck-skip {
   display: block;
 }
 

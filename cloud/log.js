@@ -50,7 +50,8 @@ export function foldEvents(events) {
         if ("text" in p) cur.text = p.text;
         if ("order" in p) cur.order = p.order;
         if ("kind" in p) cur.kind = p.kind; // "item" | "separator"
-        if ("checked" in p) cur.checked = !!p.checked;
+        if ("status" in p) cur.status = p.status; // "none" | "done" | "skipped"
+        if ("checked" in p) cur.status = p.checked ? "done" : "none"; // legacy
         if ("deleted" in p) cur._deleted = !!p.deleted; // upsertable for undo
         items.set(e.target, cur);
         break;
@@ -63,7 +64,11 @@ export function foldEvents(events) {
       }
       case "item.check": {
         const cur = items.get(e.target);
-        if (cur) cur.checked = !!e.payload.checked;
+        if (cur) {
+          // Three-state via {status}; legacy {checked} maps to done/none.
+          if ("status" in e.payload) cur.status = e.payload.status;
+          else cur.status = e.payload.checked ? "done" : "none";
+        }
         break;
       }
       case "session.reset": {
@@ -78,7 +83,7 @@ export function foldEvents(events) {
           if (!parent || parent._deleted) continue;
           const inScope =
             scope === "recycling" ? parent.recycles === true : it.listId === scope;
-          if (inScope) it.checked = false;
+          if (inScope) it.status = "none";
         }
         break;
       }
@@ -105,7 +110,8 @@ export function foldEvents(events) {
         listId: i.listId,
         text: i.text,
         order: i.order,
-        checked: i.checked,
+        status: i.status, // "none" | "done" | "skipped"
+        checked: i.status === "done", // derived, for progress + legacy readers
         kind: i.kind,
       })),
   };
@@ -159,7 +165,7 @@ function newItem(id) {
     listId: "",
     text: "",
     order: 0,
-    checked: false,
+    status: "none", // "none" | "done" | "skipped"
     kind: "item",
     _deleted: false,
   };
