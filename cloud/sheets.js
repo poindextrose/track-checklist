@@ -53,10 +53,20 @@ export async function findOrCreateSpreadsheet({
   const q =
     `name='${title}' and ` +
     `mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
-  const listUrl =
-    `${DRIVE_API}?q=${encodeURIComponent(q)}&spaces=drive` +
-    `&fields=${encodeURIComponent("files(id,name)")}`;
-  const found = await apiRequest({ method: "GET", url: listUrl, ...cfg });
+  const params = new URLSearchParams({
+    q,
+    spaces: "drive",
+    // Oldest first, so every device deterministically converges on the SAME
+    // sheet even if a duplicate was ever created — avoiding a split brain /
+    // apparent clobber. Data is never lost either way (the log only appends).
+    orderBy: "createdTime",
+    fields: "files(id,name,createdTime)",
+  });
+  const found = await apiRequest({
+    method: "GET",
+    url: `${DRIVE_API}?${params.toString()}`,
+    ...cfg,
+  });
   if (found.files && found.files.length) return found.files[0].id;
 
   // Create the spreadsheet with a single Log tab.

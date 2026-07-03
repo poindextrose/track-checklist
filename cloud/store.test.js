@@ -133,6 +133,28 @@ test("rapid same-millisecond edits preserve dispatch order, not id order", async
   assert.equal(A.state().lists[0].title, "Renamed");
 });
 
+test("a fresh device with local edits merges with an existing cloud sheet, never clobbering it", async () => {
+  const sheet = sharedSheet();
+  const clock = mkClock();
+  // Device A already populated the cloud sheet with a list + item.
+  const A = createStore({ device: "dA", sheets: connection(sheet), storage: fakeStorage(), clock, idgen: mkIdgen("dA") });
+  A.dispatch("list.upsert", "lA", { title: "A-list", recycles: false, order: 0 });
+  A.dispatch("item.upsert", "iA", { listId: "lA", text: "A-item", order: 0 });
+  await A.sync();
+
+  // Device B is brand-new (empty storage) but the user adds an item BEFORE the
+  // first sync completes — like opening the site on a new browser and typing.
+  const B = createStore({ device: "dB", sheets: connection(sheet), storage: fakeStorage(), clock, idgen: mkIdgen("dB") });
+  B.dispatch("item.upsert", "iB", { listId: "lA", text: "B-item", order: 1 });
+  await B.sync(); // pulls A's data AND pushes B's -> merge, not overwrite
+  await A.sync(); // A picks up B's addition
+
+  const texts = (s) => s.state().items.map((i) => i.text).sort();
+  assert.deepEqual(texts(B), ["A-item", "B-item"], "B sees both items");
+  assert.deepEqual(texts(A), ["A-item", "B-item"], "A still has A-item and gains B-item");
+  assert.ok(A.state().lists.some((l) => l.title === "A-list"), "A's list is not clobbered");
+});
+
 // -----------------------------------------------------------------
 // fakes
 // -----------------------------------------------------------------
