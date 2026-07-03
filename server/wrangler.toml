@@ -7,7 +7,7 @@ compatibility_date = "2024-11-01"
 # then paste the returned id below.
 [[kv_namespaces]]
 binding = "TOKENS"
-id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+id = "e1b751aeefd144bc97379b1eaf30e2fc"
 
 # Secrets are NOT stored here — set them with `wrangler secret put`:
 #   wrangler secret put GOOGLE_CLIENT_ID
