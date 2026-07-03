@@ -2,10 +2,11 @@
 // Track Day Checklist — Google sign-in (GIS token model)
 //
 // Uses Google Identity Services' OAuth token client, loaded from a CDN
-// <script> (no bundler). Requests only the drive.file scope. The access
-// token lives in memory only (short-lived, sensitive); what we persist is
-// tcl_mode="cloud", the discovered spreadsheet id, and the Client ID, so a
-// reload can silently re-auth and reconnect.
+// <script> (no bundler). Requests only the drive.file scope. We persist the
+// short-lived access token (+ expiry) in localStorage alongside
+// tcl_mode="cloud", the spreadsheet id, and the Client ID, so a relaunch
+// (including an iOS home-screen app, which loses in-memory state and can't
+// silently re-auth) reconnects instantly while the token is still valid.
 //
 // A sign-in returns a "session":
 //   { getToken(), spreadsheetId, ensureFreshToken(), signOut() }
@@ -19,6 +20,8 @@ const SCOPE = "https://www.googleapis.com/auth/drive.file";
 const LS_MODE = "tcl_mode";
 const LS_SHEET_ID = "tcl_sheet_id";
 const LS_CLIENT_ID = "tcl_client_id";
+const LS_ACCESS_TOKEN = "tcl_access_token";
+const LS_TOKEN_EXPIRY = "tcl_token_expiry";
 
 // The app's OAuth Web Client ID. Not a secret — it only works from the
 // Authorized JavaScript origins configured in the Google Cloud project. If
@@ -30,6 +33,43 @@ const HARDCODED_CLIENT_ID =
 let tokenClient = null;
 let accessToken = null;
 let tokenExpiry = 0; // epoch ms
+
+// Restore a previously-acquired token from localStorage, but only if it's
+// still valid. This is what lets an iOS home-screen app (which loses all
+// in-memory state and can't silently re-auth) reconnect instantly on relaunch
+// within the token's ~1-hour lifetime instead of forcing a fresh sign-in.
+(function restoreToken() {
+  try {
+    const t = localStorage.getItem(LS_ACCESS_TOKEN);
+    const exp = Number(localStorage.getItem(LS_TOKEN_EXPIRY) || 0);
+    if (t && exp > Date.now() + 60_000) {
+      accessToken = t;
+      tokenExpiry = exp;
+    }
+  } catch {
+    /* ignore */
+  }
+})();
+
+function persistToken() {
+  try {
+    localStorage.setItem(LS_ACCESS_TOKEN, accessToken);
+    localStorage.setItem(LS_TOKEN_EXPIRY, String(tokenExpiry));
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearToken() {
+  accessToken = null;
+  tokenExpiry = 0;
+  try {
+    localStorage.removeItem(LS_ACCESS_TOKEN);
+    localStorage.removeItem(LS_TOKEN_EXPIRY);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function getClientId() {
   return HARDCODED_CLIENT_ID || localStorage.getItem(LS_CLIENT_ID) || "";
@@ -75,8 +115,7 @@ export function cachedSession() {
 
 export function signOut() {
   const tok = accessToken;
-  accessToken = null;
-  tokenExpiry = 0;
+  clearToken();
   localStorage.removeItem(LS_MODE); // back to Local; keep sheet id + client id cached
   try {
     if (tok && window.google?.accounts?.oauth2?.revoke) {
@@ -156,6 +195,7 @@ function requestToken(prompt) {
       if (resp && resp.access_token) {
         accessToken = resp.access_token;
         tokenExpiry = Date.now() + Number(resp.expires_in || 3600) * 1000;
+        persistToken();
         done(resolve, accessToken);
       } else {
         done(reject, new Error(resp && resp.error ? resp.error : "token_failed"));
