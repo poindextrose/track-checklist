@@ -776,12 +776,51 @@ body[data-screen="go"] {
 }
 
 .row-delete {
-  justify-self: end;
+  justify-self: start;
   color: var(--danger);
 }
 
 .row-delete:active {
   color: var(--text);
+}
+
+/* Named separator rows in a cloud list */
+.separator-row {
+  background: transparent;
+  border: none;
+  border-top: 2px solid var(--border);
+  border-radius: 0;
+  min-height: 48px;
+  margin-top: 6px;
+}
+
+.separator-row .sep-area {
+  cursor: default;
+}
+
+.separator-row .check-text {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+/* Side-by-side "Add item" / "Add separator" buttons */
+.cloud-add-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.cloud-add-row .btn {
+  width: 100%;
+}
+
+.icon-btn[disabled] {
+  opacity: 0.3;
+  pointer-events: none;
 }
 
 .settings-list-name {

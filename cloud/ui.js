@@ -38,6 +38,7 @@ export function leaveCloud() {
   stopPolling();
   store = null;
   currentListId = null;
+  undoStack = [];
 }
 
 // -----------------------------------------------------------------
@@ -100,7 +101,10 @@ function listGroup(label, lists, state) {
 }
 
 function progressOf(listId, state) {
-  const items = state.items.filter((i) => i.listId === listId);
+  // Separators aren't checkable, so they don't count toward progress.
+  const items = state.items.filter(
+    (i) => i.listId === listId && i.kind !== "separator",
+  );
   return { done: items.filter((i) => i.checked).length, total: items.length };
 }
 
@@ -110,6 +114,7 @@ function progressOf(listId, state) {
 
 function openList(listId) {
   currentListId = listId;
+  undoStack = []; // fresh undo history per list visit
   renderList();
   setScreen("cloud-list");
   window.scrollTo(0, 0);
@@ -149,10 +154,12 @@ function renderList() {
     for (const item of items) ul.appendChild(buildCloudRow(item));
     ul._sortable = makeCloudSortable(ul);
   }
+  updateUndoButton();
   lastSig = viewSignature();
 }
 
 function buildCloudRow(item) {
+  if (item.kind === "separator") return buildSeparatorRow(item);
   const li = document.createElement("li");
   li.className = "check-row";
   li.dataset.id = item.id;
@@ -194,12 +201,42 @@ function buildCloudRow(item) {
   return li;
 }
 
+// A named divider between items. Draggable and editable like an item, but
+// with no checkbox and no checked state.
+function buildSeparatorRow(item) {
+  const li = document.createElement("li");
+  li.className = "check-row separator-row";
+  li.dataset.id = item.id;
+  li.innerHTML = `
+    <span class="drag-handle" aria-label="Drag to reorder">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <path fill="currentColor" d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z" />
+      </svg>
+    </span>
+    <span class="check-area sep-area">
+      <span class="check-text"></span>
+    </span>
+    <button class="icon-btn icon-btn-small row-edit" aria-label="Edit separator">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+      </svg>
+    </button>`;
+  li.querySelector(".check-text").textContent = item.text;
+  li.querySelector(".row-edit").addEventListener("click", (e) => {
+    e.stopPropagation();
+    editCloudRow(li);
+  });
+  return li;
+}
+
 function toggleCloudCheck(li) {
   if (li.classList.contains("editing")) return;
   const id = li.dataset.id;
-  const nowChecked = !li.classList.contains("checked");
+  const prev = li.classList.contains("checked");
+  const nowChecked = !prev;
   li.classList.toggle("checked", nowChecked);
   li.querySelector(".check-area").setAttribute("aria-checked", String(nowChecked));
+  pushUndo(() => store.dispatch("item.check", id, { checked: prev }));
   store.dispatch("item.check", id, { checked: nowChecked });
   lastSig = viewSignature();
   syncNow();
@@ -215,9 +252,11 @@ function editCloudRow(li) {
     originalText,
     (value, save) => {
       if (save && value === "") {
+        pushUndo(() => store.dispatch("item.upsert", id, { deleted: false }));
         store.dispatch("item.delete", id, {});
         renderList();
       } else if (save && value !== originalText) {
+        pushUndo(() => store.dispatch("item.upsert", id, { text: originalText }));
         store.dispatch("item.upsert", id, { text: value });
         renderList();
       } else {
@@ -227,6 +266,7 @@ function editCloudRow(li) {
     },
     () => {
       // Explicit trash-button delete.
+      pushUndo(() => store.dispatch("item.upsert", id, { deleted: false }));
       store.dispatch("item.delete", id, {});
       renderList();
       syncNow();
@@ -235,28 +275,43 @@ function editCloudRow(li) {
 }
 
 function addCloudItem() {
+  addCloudRow("item");
+}
+
+function addCloudSeparator() {
+  addCloudRow("separator");
+}
+
+// Append a new row (item or separator) with an inline name field.
+function addCloudRow(kind) {
   const list = currentList();
   if (!list) return;
   const ul = $("cloud-list-items");
   const placeholder = ul.querySelector(".checklist-empty");
   if (placeholder) placeholder.remove();
 
+  const isSep = kind === "separator";
   const li = document.createElement("li");
-  li.className = "check-row";
-  li.innerHTML = `
-    <span class="drag-handle" aria-hidden="true"></span>
-    <span class="check-area"><span class="check-box"></span><span class="check-text"></span></span>
-    <span></span>`;
+  li.className = "check-row" + (isSep ? " separator-row" : "");
+  li.innerHTML =
+    `<span class="drag-handle" aria-hidden="true"></span>` +
+    `<span class="check-area">` +
+    (isSep ? "" : `<span class="check-box"></span>`) +
+    `<span class="check-text"></span></span>` +
+    `<span></span>`;
   ul.appendChild(li);
 
   const order = itemsOf(list.id).length;
   startInlineEdit(li, "", (value, save) => {
     if (save && value !== "") {
-      store.dispatch("item.upsert", store.newId(), {
+      const id = store.newId();
+      store.dispatch("item.upsert", id, {
         listId: list.id,
         text: value,
         order,
+        kind,
       });
+      pushUndo(() => store.dispatch("item.upsert", id, { deleted: true }));
       syncNow();
     }
     renderList();
@@ -294,6 +349,10 @@ function startInlineEdit(li, originalText, onDone, onDelete) {
   };
 
   if (onDelete) {
+    // Put the trash button on the LEFT (in place of the drag handle) and hide
+    // the edit pencil, so a double-tap on the pencil can't land on delete.
+    const handle = li.querySelector(".drag-handle");
+    if (handle) handle.style.display = "none";
     const pencil = li.querySelector(".row-edit");
     if (pencil) pencil.style.display = "none";
     const del = document.createElement("button");
@@ -303,7 +362,7 @@ function startInlineEdit(li, originalText, onDone, onDelete) {
     del.innerHTML =
       `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">` +
       `<path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" /></svg>`;
-    li.appendChild(del);
+    li.insertBefore(del, li.firstChild);
     del.addEventListener("click", (e) => {
       e.preventDefault();
       if (resolved) return;
@@ -337,14 +396,45 @@ function makeCloudSortable(ul) {
     chosenClass: "sortable-chosen",
     dragClass: "sortable-drag",
     onEnd: () => {
+      const oldOrders = itemsOf(currentListId).map((i) => [i.id, i.order]);
       const ids = [...ul.querySelectorAll(".check-row")].map((r) => r.dataset.id);
       ids.forEach((id, idx) => {
         if (id) store.dispatch("item.upsert", id, { order: idx });
       });
+      pushUndo(() =>
+        oldOrders.forEach(([id, order]) =>
+          store.dispatch("item.upsert", id, { order }),
+        ),
+      );
       renderList();
       syncNow();
     },
   });
+}
+
+// -----------------------------------------------------------------
+// Undo (session-scoped, per open list)
+// -----------------------------------------------------------------
+
+let undoStack = [];
+
+function pushUndo(fn) {
+  undoStack.push(fn);
+  updateUndoButton();
+}
+
+function undo() {
+  const fn = undoStack.pop();
+  if (!fn) return;
+  fn();
+  renderList();
+  syncNow();
+  updateUndoButton();
+}
+
+function updateUndoButton() {
+  const b = $("cloud-undo");
+  if (b) b.disabled = undoStack.length === 0;
 }
 
 // -----------------------------------------------------------------
@@ -510,7 +600,9 @@ function wireChrome() {
     setScreen("cloud-home");
   });
   $("cloud-add-item").addEventListener("click", addCloudItem);
+  $("cloud-add-separator").addEventListener("click", addCloudSeparator);
   $("cloud-home-add-list").addEventListener("click", addListInline);
+  $("cloud-undo").addEventListener("click", undo);
 
   $("cloud-list-reset").addEventListener("click", () => {
     if (currentListId) {
