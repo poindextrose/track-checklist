@@ -97,12 +97,19 @@ async function exchange(body, env, cors) {
     return json({ error: "no_refresh_token" }, 400, cors);
   }
 
-  // The id_token comes straight from Google over TLS (server-to-server), so
-  // it's authentic; we just decode it to bind the session to the user, and
-  // sanity-check the audience.
-  const claims = decodeJwt(data.id_token);
-  if (!claims || claims.aud !== env.GOOGLE_CLIENT_ID) {
-    return json({ error: "bad_id_token" }, 400, cors);
+  // An id_token is only returned when the "openid" scope is requested; this app
+  // asks for drive.file only, so there usually isn't one. We don't need it —
+  // the code exchange (with the client secret) already authenticates. If one IS
+  // present (came straight from Google over TLS) and its audience matches,
+  // capture the user identity for the record; otherwise just proceed.
+  let sub = "";
+  let email = "";
+  if (data.id_token) {
+    const claims = decodeJwt(data.id_token);
+    if (claims && claims.aud === env.GOOGLE_CLIENT_ID) {
+      sub = claims.sub || "";
+      email = claims.email || "";
+    }
   }
 
   const session_token = randomToken();
@@ -111,8 +118,8 @@ async function exchange(body, env, cors) {
     session_token,
     JSON.stringify({
       refresh_token: data.refresh_token,
-      sub: claims.sub,
-      email: claims.email || "",
+      sub,
+      email,
       created_at: now,
       last_used_at: now,
     }),

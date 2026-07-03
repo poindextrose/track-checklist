@@ -46,14 +46,30 @@ test("/exchange reports no_refresh_token when Google omits one", async () => {
   assert.equal((await res.json()).error, "no_refresh_token");
 });
 
-test("/exchange rejects an id_token for a different client id", async () => {
+test("/exchange succeeds with no id_token (drive.file-only scope, no openid)", async () => {
+  const env = makeEnv({ __fetch: googleStub({ noIdToken: true }) });
+  const res = await handle(
+    req("POST", "/exchange", { origin: ORIGIN, body: { code: "AUTHCODE" } }),
+    env,
+  );
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.ok(data.session_token, "session created without an id_token");
+  const rec = JSON.parse(await env.TOKENS.get(data.session_token));
+  assert.equal(rec.refresh_token, "RT_123");
+  assert.equal(rec.sub, "", "no user id when there's no id_token");
+});
+
+test("/exchange ignores a mismatched-aud id_token but still succeeds", async () => {
   const env = makeEnv({ __fetch: googleStub({ aud: "someone-else" }) });
   const res = await handle(
     req("POST", "/exchange", { origin: ORIGIN, body: { code: "AUTHCODE" } }),
     env,
   );
-  assert.equal(res.status, 400);
-  assert.equal((await res.json()).error, "bad_id_token");
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  const rec = JSON.parse(await env.TOKENS.get(data.session_token));
+  assert.equal(rec.sub, "", "sub not captured from a mismatched-aud token");
 });
 
 test("/token mints a fresh access token for a valid session", async () => {
@@ -226,6 +242,7 @@ function googleStub(opts = {}) {
     refreshInvalid = false,
     refreshServerError = false,
     refreshThrows = false,
+    noIdToken = false,
     aud = CID,
   } = opts;
   return async (url, init) => {
@@ -235,17 +252,17 @@ function googleStub(opts = {}) {
       const grant = params.get("grant_type");
       if (grant === "refresh_token" && refreshThrows) throw new Error("network down");
       if (grant === "authorization_code") {
-        const body = {
-          access_token: "AT_new",
-          expires_in: 3599,
-          id_token: fakeIdToken({
+        const body = { access_token: "AT_new", expires_in: 3599 };
+        // An id_token is only present when the openid scope is requested.
+        if (!noIdToken) {
+          body.id_token = fakeIdToken({
             aud,
             iss: "https://accounts.google.com",
             sub: "user-123",
             email: "a@b.com",
             exp: Math.floor(Date.now() / 1000) + 3600,
-          }),
-        };
+          });
+        }
         if (withRefresh) body.refresh_token = "RT_123";
         return jsonResp(body, 200);
       }
