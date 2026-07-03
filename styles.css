@@ -855,6 +855,7 @@ body[data-screen="cloud-settings"] .cloud-status {
 .cloud-status[data-status="offline"] {
   color: var(--warning);
   border-color: var(--warning);
+  cursor: pointer;
 }
 
 .cloud-status[data-status="syncing"] {

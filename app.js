@@ -83,6 +83,10 @@ function startCloud(session, sheetsClient) {
         leaveCloud();
         local.enter();
       },
+      // Interactive re-auth when the token can't be refreshed silently
+      // (triggered by tapping the offline status pill — a real user gesture,
+      // so the popup is allowed).
+      onReconnect: session ? () => auth.signIn() : undefined,
     },
   });
   return store;
@@ -117,12 +121,12 @@ window.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", signInFlow);
   });
 
-  if (auth.isCloudSelected()) {
-    // Previously signed in — try to silently reconnect, else fall to Local.
-    auth
-      .resume()
-      .then((session) => (session ? startCloud(session) : local.enter()))
-      .catch(() => local.enter());
+  if (auth.hasCloudSession()) {
+    // Previously signed in on this device: resume Cloud mode immediately from
+    // the local cache (offline-first). The token is re-acquired silently on
+    // the first sync; if that can't happen, the user stays in Cloud mode and
+    // can tap the offline pill to reconnect.
+    startCloud(auth.cachedSession());
   } else {
     local.enter();
   }

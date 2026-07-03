@@ -28,6 +28,7 @@ export function enterCloud(opts) {
   wireChrome();
   renderHome();
   setScreen("cloud-home");
+  setStatus("syncing"); // honest initial state until the first sync settles
   startPolling();
   // Kick an immediate sync so a fresh device pulls existing lists.
   syncNow();
@@ -525,6 +526,9 @@ function wireChrome() {
     if (hooks.onSignOut) hooks.onSignOut();
   });
 
+  // Tap the pill while offline to re-authenticate and resume syncing.
+  $("cloud-status").addEventListener("click", onStatusClick);
+
   const saveId = $("cloud-clientid-save");
   if (saveId) {
     saveId.addEventListener("click", () => {
@@ -585,5 +589,22 @@ function setStatus(kind) {
   if (!pill) return;
   pill.dataset.status = kind;
   pill.textContent =
-    kind === "offline" ? "Offline" : kind === "syncing" ? "Syncing…" : "Synced";
+    kind === "offline"
+      ? "Offline · reconnect"
+      : kind === "syncing"
+        ? "Syncing…"
+        : "Synced";
+}
+
+async function onStatusClick() {
+  const pill = $("cloud-status");
+  if (!pill || pill.dataset.status !== "offline" || !hooks.onReconnect) return;
+  setStatus("syncing");
+  try {
+    await hooks.onReconnect();
+  } catch {
+    setStatus("offline");
+    return;
+  }
+  syncNow();
 }

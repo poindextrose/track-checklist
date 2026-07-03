@@ -56,18 +56,21 @@ export async function signIn() {
   return session(spreadsheetId);
 }
 
-// Silent reconnect on boot when cloud was previously selected. Resolves to a
-// session, or null if we can't silently re-auth (caller falls back to Local).
-export async function resume() {
-  if (!isCloudSelected() || !clientIdConfigured()) return null;
-  try {
-    await loadGis();
-    await requestToken(""); // silent: no UI if a Google session exists
-    const spreadsheetId = await ensureSheet();
-    return session(spreadsheetId);
-  } catch {
-    return null;
-  }
+// True when the user previously signed in on this device (mode + a known
+// spreadsheet cached). The access token is NOT persisted, so this doesn't
+// mean we currently hold a valid token — just that we should resume Cloud
+// mode and (re)acquire a token lazily.
+export function hasCloudSession() {
+  return (
+    isCloudSelected() && clientIdConfigured() && !!localStorage.getItem(LS_SHEET_ID)
+  );
+}
+
+// A session restored from cached identifiers, WITHOUT a token yet. The app
+// boots straight into Cloud mode from the local cache (offline-first); the
+// token is obtained lazily and silently by ensureFreshToken on the first sync.
+export function cachedSession() {
+  return session(localStorage.getItem(LS_SHEET_ID));
 }
 
 export function signOut() {
@@ -115,28 +118,53 @@ async function ensureSheet() {
   return id;
 }
 
+let pendingReject = null;
+
 function ensureTokenClient() {
   if (tokenClient) return;
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: getClientId(),
     scope: SCOPE,
-    callback: () => {}, // replaced per request
+    callback: () => {}, // success handler set per request
+    error_callback: (err) => {
+      // Fires for popup-blocked, silent-refresh failure, user-cancel, etc.
+      if (pendingReject) {
+        const rej = pendingReject;
+        pendingReject = null;
+        rej(new Error(err && err.type ? err.type : "token_error"));
+      }
+    },
   });
 }
 
 function requestToken(prompt) {
   return new Promise((resolve, reject) => {
     ensureTokenClient();
+    pendingReject = reject;
+    const timer = setTimeout(() => {
+      if (pendingReject) {
+        pendingReject = null;
+        reject(new Error("token_timeout"));
+      }
+    }, 10000);
+    const done = (fn, value) => {
+      clearTimeout(timer);
+      pendingReject = null;
+      fn(value);
+    };
     tokenClient.callback = (resp) => {
-      if (resp.error) return reject(new Error(resp.error));
-      accessToken = resp.access_token;
-      tokenExpiry = Date.now() + Number(resp.expires_in || 3600) * 1000;
-      resolve(accessToken);
+      if (resp && resp.access_token) {
+        accessToken = resp.access_token;
+        tokenExpiry = Date.now() + Number(resp.expires_in || 3600) * 1000;
+        done(resolve, accessToken);
+      } else {
+        done(reject, new Error(resp && resp.error ? resp.error : "token_failed"));
+      }
     };
     try {
       tokenClient.requestAccessToken({ prompt });
     } catch (err) {
-      reject(err);
+      done(reject, err);
     }
   });
 }
