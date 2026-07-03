@@ -22,6 +22,11 @@
 const GOOGLE_TOKEN = "https://oauth2.googleapis.com/token";
 const GOOGLE_REVOKE = "https://oauth2.googleapis.com/revoke";
 
+// Auto-evict a session that hasn't been used in this long (seconds). Refreshed
+// on every /token, so active users are unaffected; bounds the window a stolen
+// but idle session_token stays usable. ~180 days.
+const SESSION_TTL = 180 * 24 * 60 * 60;
+
 export default {
   async fetch(request, env) {
     return handle(request, env);
@@ -36,24 +41,33 @@ export async function handle(request, env) {
     return new Response(null, { status: 204, headers: cors });
   }
 
-  const path = new URL(request.url).pathname.replace(/\/+$/, "") || "/";
+  // Any unexpected throw still returns a CORS'd response the browser can read
+  // (and which the client treats as transient — it never wipes the session).
+  try {
+    const path = new URL(request.url).pathname.replace(/\/+$/, "") || "/";
 
-  if (request.method === "GET" && path === "/health") {
-    return json({ ok: true }, 200, cors);
-  }
-
-  if (request.method === "POST") {
-    // State-changing calls must come from the configured app origin.
-    if (!originAllowed(origin, env.ALLOWED_ORIGIN)) {
-      return json({ error: "forbidden_origin" }, 403, cors);
+    if (request.method === "GET" && path === "/health") {
+      return json({ ok: true }, 200, cors);
     }
-    const body = await request.json().catch(() => ({}));
-    if (path === "/exchange") return exchange(body, env, cors);
-    if (path === "/token") return mintToken(body, env, cors);
-    if (path === "/signout") return signout(body, env, cors);
-  }
 
-  return json({ error: "not_found" }, 404, cors);
+    if (request.method === "POST") {
+      // The Origin equality check is CSRF hygiene (it blocks casual cross-site
+      // *browser* calls), NOT the real authorization gate — a non-browser
+      // client can forge Origin. Possession of the session_token is the actual
+      // credential; its blast radius is bounded to this user's drive.file.
+      if (!originAllowed(origin, env.ALLOWED_ORIGIN)) {
+        return json({ error: "forbidden_origin" }, 403, cors);
+      }
+      const body = await request.json().catch(() => ({}));
+      if (path === "/exchange") return exchange(body, env, cors);
+      if (path === "/token") return mintToken(body, env, cors);
+      if (path === "/signout") return signout(body, env, cors);
+    }
+
+    return json({ error: "not_found" }, 404, cors);
+  } catch {
+    return json({ error: "server_error" }, 500, cors);
+  }
 }
 
 // -----------------------------------------------------------------
@@ -102,6 +116,7 @@ async function exchange(body, env, cors) {
       created_at: now,
       last_used_at: now,
     }),
+    { expirationTtl: SESSION_TTL },
   );
 
   return json(
@@ -116,15 +131,25 @@ async function mintToken(body, env, cors) {
   if (!session_token) return json({ error: "missing_session" }, 400, cors);
 
   const raw = await env.TOKENS.get(session_token);
-  if (!raw) return json({ error: "unknown_session" }, 401, cors);
-  const rec = JSON.parse(raw);
+  const rec = safeParse(raw);
+  if (!rec || !rec.refresh_token) {
+    // No row, or a corrupt one — treat as a dead session (client re-auths).
+    if (raw) await env.TOKENS.delete(session_token);
+    return json({ error: "unknown_session" }, 401, cors);
+  }
 
-  const res = await googleToken(env, {
-    grant_type: "refresh_token",
-    refresh_token: rec.refresh_token,
-    client_id: env.GOOGLE_CLIENT_ID,
-    client_secret: env.GOOGLE_CLIENT_SECRET,
-  });
+  let res;
+  try {
+    res = await googleToken(env, {
+      grant_type: "refresh_token",
+      refresh_token: rec.refresh_token,
+      client_id: env.GOOGLE_CLIENT_ID,
+      client_secret: env.GOOGLE_CLIENT_SECRET,
+    });
+  } catch {
+    // Network-level failure reaching Google — transient, keep the session.
+    return json({ error: "upstream_unreachable" }, 503, cors);
+  }
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
@@ -138,16 +163,15 @@ async function mintToken(body, env, cors) {
   }
 
   rec.last_used_at = Math.floor(Date.now() / 1000);
-  await env.TOKENS.put(session_token, JSON.stringify(rec));
+  await env.TOKENS.put(session_token, JSON.stringify(rec), { expirationTtl: SESSION_TTL });
   return json({ access_token: data.access_token, expires_in: data.expires_in }, 200, cors);
 }
 
 async function signout(body, env, cors) {
   const { session_token } = body;
   if (session_token) {
-    const raw = await env.TOKENS.get(session_token);
-    if (raw) {
-      const rec = JSON.parse(raw);
+    const rec = safeParse(await env.TOKENS.get(session_token));
+    if (rec && rec.refresh_token) {
       try {
         const doFetch = env.__fetch || fetch;
         await doFetch(GOOGLE_REVOKE + "?token=" + encodeURIComponent(rec.refresh_token), {
@@ -156,8 +180,8 @@ async function signout(body, env, cors) {
       } catch {
         /* best effort */
       }
-      await env.TOKENS.delete(session_token);
     }
+    await env.TOKENS.delete(session_token);
   }
   return new Response(null, { status: 204, headers: cors });
 }
@@ -195,6 +219,15 @@ function json(obj, status, cors) {
     status,
     headers: { ...cors, "Content-Type": "application/json" },
   });
+}
+
+function safeParse(raw) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 function randomToken() {

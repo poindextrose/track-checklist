@@ -106,6 +106,40 @@ test("/token returns a transient 503 (keeps the session) on an upstream error", 
   assert.ok(await env.TOKENS.get(ex.session_token), "session preserved for retry");
 });
 
+test("/token treats a corrupt KV record as a dead session (401) and deletes it", async () => {
+  const env = makeEnv({ __fetch: googleStub() });
+  await env.TOKENS.put("corrupt", "not-json{");
+  const res = await handle(
+    req("POST", "/token", { origin: ORIGIN, body: { session_token: "corrupt" } }),
+    env,
+  );
+  assert.equal(res.status, 401);
+  assert.equal((await res.json()).error, "unknown_session");
+  assert.equal(await env.TOKENS.get("corrupt"), null);
+});
+
+test("/token returns a transient 503 when Google is unreachable (fetch throws)", async () => {
+  const env = makeEnv({ __fetch: googleStub({ refreshThrows: true }) });
+  const ex = await (
+    await handle(req("POST", "/exchange", { origin: ORIGIN, body: { code: "C" } }), env)
+  ).json();
+  const res = await handle(
+    req("POST", "/token", { origin: ORIGIN, body: { session_token: ex.session_token } }),
+    env,
+  );
+  assert.equal(res.status, 503);
+  assert.ok(await env.TOKENS.get(ex.session_token), "session preserved for retry");
+});
+
+test("every error response carries CORS headers the browser can read", async () => {
+  const env = makeEnv({ __fetch: googleStub() });
+  const res = await handle(
+    req("POST", "/token", { origin: ORIGIN, body: { session_token: "nope" } }),
+    env,
+  );
+  assert.equal(res.headers.get("Access-Control-Allow-Origin"), ORIGIN);
+});
+
 test("/signout deletes the session row", async () => {
   const env = makeEnv({ __fetch: googleStub() });
   const ex = await (
@@ -187,12 +221,19 @@ function jsonResp(obj, status) {
 
 // Stubs Google's token + revoke endpoints.
 function googleStub(opts = {}) {
-  const { withRefresh = true, refreshInvalid = false, refreshServerError = false, aud = CID } = opts;
+  const {
+    withRefresh = true,
+    refreshInvalid = false,
+    refreshServerError = false,
+    refreshThrows = false,
+    aud = CID,
+  } = opts;
   return async (url, init) => {
     const u = String(url);
     if (u.startsWith("https://oauth2.googleapis.com/token")) {
       const params = new URLSearchParams(init.body);
       const grant = params.get("grant_type");
+      if (grant === "refresh_token" && refreshThrows) throw new Error("network down");
       if (grant === "authorization_code") {
         const body = {
           access_token: "AT_new",

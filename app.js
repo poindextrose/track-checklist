@@ -58,13 +58,9 @@ function lsStorage(key) {
 // Cloud boot
 // -----------------------------------------------------------------
 
-function startCloud(session, sheetsClient) {
-  const sheets =
-    sheetsClient ||
-    createSheetsClient({
-      getToken: session.getToken,
-      spreadsheetId: session.spreadsheetId,
-    });
+// Build the cloud store + enter the UI (synchronous). session may be null for
+// the test seam (a fake sheets client is injected instead).
+function buildAndEnterCloud(session, sheets) {
   const store = createStore({
     device: deviceId(),
     sheets,
@@ -83,13 +79,33 @@ function startCloud(session, sheetsClient) {
         leaveCloud();
         local.enter();
       },
-      // Interactive re-auth when the token can't be refreshed silently
-      // (triggered by tapping the offline status pill — a real user gesture,
-      // so the popup is allowed).
+      // Interactive re-auth when the token can't be refreshed (tapping the
+      // offline status pill — a real user gesture, so the popup/redirect works).
       onReconnect: session ? () => auth.signIn() : undefined,
     },
   });
   return store;
+}
+
+async function startCloud(session, sheetsClient) {
+  if (sheetsClient) return buildAndEnterCloud(session, sheetsClient); // test seam
+
+  let spreadsheetId = session ? session.spreadsheetId : null;
+  if (session && !spreadsheetId) {
+    // First sign-in (or a lost sheet id): resolve the user's Sheet now that we
+    // can obtain a token. If it fails (offline/Drive blip), fall back to Local;
+    // the durable session persists, so the next launch retries automatically.
+    try {
+      if (session.ensureFreshToken) await session.ensureFreshToken();
+      spreadsheetId = await auth.ensureSheetId();
+    } catch (e) {
+      console.error("Couldn't resolve your Sheet yet:", e);
+      local.enter();
+      return;
+    }
+  }
+  const sheets = createSheetsClient({ getToken: session.getToken, spreadsheetId });
+  return buildAndEnterCloud(session, sheets);
 }
 
 async function signInFlow() {
@@ -123,7 +139,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // Test/dev seam: drive Cloud mode against an injected Sheets client with no
   // Google. Used for automated browser verification of the cloud UI + store.
-  window.__tclCloudTest = (fakeSheets) => startCloud(null, fakeSheets);
+  window.__tclCloudTest = (fakeSheets) => buildAndEnterCloud(null, fakeSheets);
 
   if (auth.hasPendingRedirect()) {
     // Backend mode: we just came back from Google's auth-code redirect.
@@ -132,8 +148,14 @@ window.addEventListener("DOMContentLoaded", () => {
       .then((session) => startCloud(session))
       .catch((err) => {
         console.error("Cloud sign-in failed:", err);
-        toast("Google sign-in failed — staying in Local mode.");
-        local.enter();
+        // A failed/cancelled sign-in must not clobber an existing session —
+        // resume it if we still have one, otherwise fall back to Local.
+        if (auth.hasCloudSession()) {
+          startCloud(auth.cachedSession());
+        } else {
+          toast("Google sign-in failed — staying in Local mode.");
+          local.enter();
+        }
       });
     return;
   }

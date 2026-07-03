@@ -120,9 +120,8 @@ export async function signIn() {
   // Legacy GIS token flow.
   await loadGis();
   await requestToken("consent");
-  const spreadsheetId = await ensureSheet();
   localStorage.setItem(LS_MODE, "cloud");
-  return session(spreadsheetId);
+  return session(localStorage.getItem(LS_SHEET_ID)); // sheet resolved by startCloud
 }
 
 function redirectUri() {
@@ -170,17 +169,22 @@ export async function completeRedirectSignIn() {
   history.replaceState(null, "", uri);
   localStorage.removeItem(LS_OAUTH_STATE);
 
-  if (err) throw new Error("oauth_" + err);
+  if (err) {
+    console.warn("OAuth redirect error:", err); // don't interpolate the raw value
+    throw new Error("oauth_redirect_error");
+  }
   if (!code || !state || state !== expected) throw new Error("oauth_state_mismatch");
 
   const data = await backendPost("/exchange", { code, redirect_uri: uri });
+  // Commit the durable session BEFORE the fallible sheet lookup, so a transient
+  // failure resolving the Sheet can't strand an otherwise-valid sign-in (the
+  // auth code is single-use). The Sheet id is resolved lazily by startCloud.
   localStorage.setItem(LS_SESSION_TOKEN, data.session_token);
+  localStorage.setItem(LS_MODE, "cloud");
   accessToken = data.access_token;
   tokenExpiry = Date.now() + Number(data.expires_in || 3600) * 1000;
   persistToken();
-  const spreadsheetId = await ensureSheet();
-  localStorage.setItem(LS_MODE, "cloud");
-  return session(spreadsheetId);
+  return session(localStorage.getItem(LS_SHEET_ID));
 }
 
 // -----------------------------------------------------------------
@@ -189,15 +193,21 @@ export async function completeRedirectSignIn() {
 
 export function hasCloudSession() {
   if (!isCloudSelected() || !clientIdConfigured()) return false;
-  if (useBackend()) {
-    // Need a durable broker session to silently mint tokens on relaunch.
-    return !!localStorage.getItem(LS_SESSION_TOKEN) && !!localStorage.getItem(LS_SHEET_ID);
-  }
+  // Backend mode only needs the durable broker session — the Sheet id is
+  // re-derivable (startCloud resolves it). Legacy mode needs a cached sheet id.
+  if (useBackend()) return !!localStorage.getItem(LS_SESSION_TOKEN);
   return !!localStorage.getItem(LS_SHEET_ID);
 }
 
 export function cachedSession() {
   return session(localStorage.getItem(LS_SHEET_ID));
+}
+
+// Resolve (find-or-create + cache) the user's Sheet id using the current access
+// token. Called by startCloud when the id isn't cached yet. Requires a valid
+// token (call session.ensureFreshToken() first).
+export async function ensureSheetId() {
+  return ensureSheet();
 }
 
 export function signOut() {
