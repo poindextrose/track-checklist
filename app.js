@@ -123,8 +123,15 @@ async function signInFlow() {
     startCloud(session);
   } catch (err) {
     console.error("Cloud sign-in failed:", err);
-    toast("Google sign-in failed — staying in Local mode.");
+    toast("Sign-in failed: " + errText(err), 8000);
   }
+}
+
+// Human-readable reason from a thrown auth error (backend error code, HTTP
+// status, or message) so a failed sign-in surfaces something actionable.
+function errText(err) {
+  if (!err) return "unknown";
+  return err.code || err.message || String(err);
 }
 
 // -----------------------------------------------------------------
@@ -153,7 +160,7 @@ window.addEventListener("DOMContentLoaded", () => {
         if (auth.hasCloudSession()) {
           startCloud(auth.cachedSession());
         } else {
-          toast("Google sign-in failed — staying in Local mode.");
+          toast("Sign-in failed: " + errText(err), 8000);
           local.enter();
         }
       });

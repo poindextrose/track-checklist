@@ -251,6 +251,26 @@ body[data-screen="go"] {
   color: var(--text-dim);
 }
 
+/* Header "Sign in" button (shown in Local mode = not signed in) */
+.header-signin {
+  flex-shrink: 0;
+  border: none;
+  background: var(--accent-strong);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: inherit;
+  border-radius: 999px;
+  padding: 0 16px;
+  min-height: 40px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.header-signin:active {
+  transform: scale(0.98);
+}
+
 /* =================================================================
    Phase heading row (heading + reset button)
    ================================================================= */
