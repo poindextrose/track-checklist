@@ -819,7 +819,7 @@ body[data-screen="go"] {
 
 .separator-row .check-text {
   color: var(--text-dim);
-  font-size: 0.82rem;
+  font-size: 0.98rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
