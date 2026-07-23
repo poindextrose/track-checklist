@@ -1,3 +1,7 @@
+> ⚠️ **Source of truth** (2026-07-23): development continues in private monorepo
+> **[PlaidModifications](https://github.com/poindextrose/PlaidModifications)** → `apps/track-checklist/`.
+> This public repo may remain for GitHub Pages deploy; prefer monorepo for code changes.
+
 # Track Day Checklist
 
 A small static webpage that walks you through a pre-session and a post-session
